@@ -1,0 +1,51 @@
+name: Release LockPilot (Tag)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            app_dir: apps/desktop-mac
+          - os: windows-latest
+            app_dir: apps/desktop-windows
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync shared UI
+        shell: bash
+        run: bash scripts/sync-shared-ui.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps (if package.json exists)
+        shell: bash
+        working-directory: ${{ matrix.app_dir }}
+        run: |
+          if [ -f package.json ]; then
+            npm ci
+          fi
+
+      - name: Build + Upload release assets
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ${{ matrix.app_dir }}
+          tagName: ${{ github.ref_name }}
+          releaseName: LockPilot ${{ github.ref_name }}
+          releaseDraft: false
+          prerelease: ${{ contains(github.ref_name, '-dev') }}

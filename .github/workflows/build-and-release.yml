@@ -1,0 +1,59 @@
+name: Build LockPilot (Mac + Windows)
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            app_dir: apps/desktop-mac
+            artifact_name: lockpilot-mac
+          - os: windows-latest
+            app_dir: apps/desktop-windows
+            artifact_name: lockpilot-windows
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync shared UI
+        shell: bash
+        run: bash scripts/sync-shared-ui.sh
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps (if package.json exists)
+        shell: bash
+        working-directory: ${{ matrix.app_dir }}
+        run: |
+          if [ -f package.json ]; then
+            npm ci
+          fi
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ${{ matrix.app_dir }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}-${{ github.ref_name }}-${{ github.sha }}
+          path: |
+            ${{ matrix.app_dir }}/src-tauri/target/release/bundle/**
