@@ -1,12 +1,118 @@
-name: Build LockPilot (Mac + Windows)
+name: Build + Release LockPilot (Mac + Windows)
 
 on:
   push:
     branches: [main, dev]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: lockpilot-release-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  prepare_version:
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+      prerelease: ${{ steps.bump.outputs.prerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump version in both apps
+        id: bump
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION=$(python3 - <<'PY'
+import json
+from pathlib import Path
+
+root = Path('.')
+mac_conf = root / 'apps/desktop-mac/src-tauri/tauri.conf.json'
+win_conf = root / 'apps/desktop-windows/src-tauri/tauri.conf.json'
+
+mac = json.loads(mac_conf.read_text())
+major, minor, patch = map(int, mac['version'].split('.'))
+next_version = f"{major}.{minor}.{patch + 1}"
+
+for conf_path in [mac_conf, win_conf]:
+    conf = json.loads(conf_path.read_text())
+    conf['version'] = next_version
+    conf_path.write_text(json.dumps(conf, indent=2) + "\n")
+
+for cargo in [
+    root / 'apps/desktop-mac/src-tauri/Cargo.toml',
+    root / 'apps/desktop-windows/src-tauri/Cargo.toml'
+]:
+    lines = cargo.read_text().splitlines()
+    out = []
+    in_package = False
+    updated = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped == '[package]':
+            in_package = True
+            out.append(line)
+            continue
+        if in_package and stripped.startswith('[') and stripped != '[package]':
+            in_package = False
+        if in_package and stripped.startswith('version = '):
+            out.append(f'version = "{next_version}"')
+            updated = True
+        else:
+            out.append(line)
+    if not updated:
+        raise SystemExit(f'Could not update version in {cargo}')
+    cargo.write_text("\n".join(out) + "\n")
+
+print(next_version)
+PY
+)
+
+          BRANCH="${GITHUB_REF_NAME}"
+          if [ "$BRANCH" = "dev" ]; then
+            TAG="dev-v${VERSION}"
+            PRERELEASE="true"
+          else
+            TAG="v${VERSION}"
+            PRERELEASE="false"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/desktop-mac/src-tauri/tauri.conf.json \
+                  apps/desktop-mac/src-tauri/Cargo.toml \
+                  apps/desktop-windows/src-tauri/tauri.conf.json \
+                  apps/desktop-windows/src-tauri/Cargo.toml
+
+          if git diff --cached --quiet; then
+            echo "No version changes to commit"
+          else
+            git commit -m "chore(ci): bump version to ${VERSION} [skip ci]"
+            git push origin "${BRANCH}"
+          fi
+
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            git tag -d "${TAG}"
+          fi
+          git tag "${TAG}"
+          git push origin "refs/tags/${TAG}" --force
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
+
+  build_release:
+    needs: prepare_version
     strategy:
       fail-fast: false
       matrix:
@@ -21,8 +127,10 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout
+      - name: Checkout latest branch head (includes version bump)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       - name: Sync shared UI
         shell: bash
@@ -44,16 +152,24 @@ jobs:
             npm ci
           fi
 
-      - name: Build Tauri app
+      - name: Build + publish release assets
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: ${{ matrix.app_dir }}
+          tagName: ${{ needs.prepare_version.outputs.tag }}
+          releaseName: LockPilot ${{ needs.prepare_version.outputs.tag }}
+          releaseBody: |
+            Automated release from `${{ github.ref_name }}`
+            Version: `${{ needs.prepare_version.outputs.version }}`
+            Commit: `${{ github.sha }}`
+          releaseDraft: false
+          prerelease: ${{ needs.prepare_version.outputs.prerelease }}
 
-      - name: Upload artifacts
+      - name: Upload CI artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}-${{ github.ref_name }}-${{ github.sha }}
+          name: ${{ matrix.artifact_name }}-${{ needs.prepare_version.outputs.tag }}-${{ github.sha }}
           path: |
             ${{ matrix.app_dir }}/src-tauri/target/release/bundle/**
