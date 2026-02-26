@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
 use uuid::Uuid;
 
-const GITHUB_OWNER: &str = "maxacode";
-const GITHUB_REPO: &str = "LockPilot-Windows";
+const GITHUB_OWNER: &str = "clawthor0";
+const GITHUB_REPO: &str = "LockPilot-Mac-Win";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

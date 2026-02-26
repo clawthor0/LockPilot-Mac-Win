@@ -80,7 +80,7 @@ PY
 
           BRANCH="${GITHUB_REF_NAME}"
           if [ "$BRANCH" = "dev" ]; then
-            TAG="dev-v${VERSION}"
+            TAG="v${VERSION}-dev"
             PRERELEASE="true"
           else
             TAG="v${VERSION}"
