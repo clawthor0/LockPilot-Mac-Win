@@ -8,8 +8,8 @@ A Windows desktop app to schedule system actions for specific times, including r
 ## Install on Windows
 
 Quick Start:
-- **Stable (main):** [Download latest release](https://github.com/maxacode/LockPilot-Windows/releases/latest)
-- **Dev (dev):** [View all prereleases](https://github.com/maxacode/LockPilot-Windows/releases)
+- **Stable (main):** [Download latest release](https://github.com/clawthor0/LockPilot-Mac-Win/releases/latest)
+- **Dev (dev):** [View all prereleases](https://github.com/clawthor0/LockPilot-Mac-Win/releases)
 
 ## Features
 
