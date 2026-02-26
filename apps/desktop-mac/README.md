@@ -5,8 +5,8 @@ A macOS desktop app to schedule system actions for specific times, including rec
 
 ## Install on Mac
 Quick Start:
-- Stable (main): [Download latest release](https://github.com/maxacode/LockPilotMac/releases/latest)
-- Dev (dev): [Download latest dev prerelease](https://github.com/maxacode/LockPilotMac/releases/tag/dev-latest)
+- Stable (main): [Download latest release](https://github.com/clawthor0/LockPilot-Mac-Win/releases/latest)
+- Dev (dev): [View latest dev prereleases](https://github.com/clawthor0/LockPilot-Mac-Win/releases)
 
 If you distribute an unsigned or non-notarized `.app`, macOS may block it with a "damaged and can't be opened" message.
 
@@ -53,7 +53,7 @@ Recommendation: always ship signed + notarized releases for production distribut
 ## Updater and Release Source
 LockPilot checks GitHub Releases from:
 
-- `https://api.github.com/repos/maxacode/LockPilotMac/releases`
+- `https://api.github.com/repos/clawthor0/LockPilot-Mac-Win/releases`
 
 Channel mapping:
 
